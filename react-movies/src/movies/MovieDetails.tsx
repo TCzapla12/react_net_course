@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { urlMovies } from "../endpoints";
+import { urlMovies, urlRatings } from "../endpoints";
 import { useEffect, useState } from "react";
 import axios, { AxiosResponse } from "axios";
 import { movieDTO } from "./movies.model";
@@ -8,6 +8,8 @@ import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import coordinateDTO from "../utils/coordinates.model";
 import Map from "../utils/Map";
+import Ratings from "../utils/Ratings";
+import Swal from "sweetalert2";
 
 export default function MovieDetails() {
   const { id }: any = useParams();
@@ -21,16 +23,15 @@ export default function MovieDetails() {
   }, [id]);
 
   function transformCoordinates(): coordinateDTO[] {
-    if(movie?.movieTheaters)
-    {
-        const coordinates = movie.movieTheaters.map(movieTheater => {
-            return {
-                lat: movieTheater.latitude,
-                lng: movieTheater.longitude,
-                name: movieTheater.name
-            } as coordinateDTO
-        });
-        return coordinates;
+    if (movie?.movieTheaters) {
+      const coordinates = movie.movieTheaters.map((movieTheater) => {
+        return {
+          lat: movieTheater.latitude,
+          lng: movieTheater.longitude,
+          name: movieTheater.name,
+        } as coordinateDTO;
+      });
+      return coordinates;
     }
     return [];
   }
@@ -45,6 +46,12 @@ export default function MovieDetails() {
       videoId = videoId.substring(0, ampersandPosition);
     }
     return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  function handleRate(rate: number) {
+    axios.post(urlRatings, {rating: rate, movieId: id}).then(() => {
+      Swal.fire({icon: 'success', title: 'Rating received'});
+    })
   }
 
   return movie ? (
@@ -62,7 +69,8 @@ export default function MovieDetails() {
           {genre.name}
         </Link>
       ))}{" "}
-      | {movie.releaseDate.toDateString()}
+      | {movie.releaseDate.toDateString()} | Your vote:{" "}
+      <Ratings maximumValue={5} selectedValue={movie.userVote} onChange={handleRate} /> | Average vote: {movie.averageVote}
       <div style={{ display: "flex", marginTop: "1rem" }}>
         <span style={{ display: "inline-block", marginRight: "1rem" }}>
           <img src={movie.poster} style={{ width: "225px", height: "315px" }} alt="poster" />

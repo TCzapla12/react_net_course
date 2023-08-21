@@ -1,12 +1,16 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MoviesAPI.APIBehavior;
 using MoviesAPI.Filters;
 using MoviesAPI.Helpers;
 using NetTopologySuite;
 using NetTopologySuite.Geometries;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace MoviesAPI
 {
@@ -14,6 +18,7 @@ namespace MoviesAPI
     {
         public Startup(IConfiguration configuration)
         {
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             Configuration = configuration;
         }
         public IConfiguration Configuration { get; }
@@ -33,9 +38,27 @@ namespace MoviesAPI
                 options.Filters.Add(typeof(ParseBadRequest));
             }).ConfigureApiBehaviorOptions(BadRequestsBehavior.Parse);
 
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
-
             services.AddSwaggerGen(options => { options.SwaggerDoc("v1", new OpenApiInfo { Title = "MoviesAPI", Version = "v1" }); });
+
+            services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>().AddDefaultTokenProviders();
+
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["keyjwt"])),
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("IsAdmin", policy => policy.RequireClaim("role", "admin"));
+            });
 
             services.AddCors(options =>
             {
@@ -56,7 +79,7 @@ namespace MoviesAPI
             services.AddAutoMapper(typeof(Startup));
 
             services.AddSingleton<GeometryFactory>(NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326));
-     
+
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILogger<Startup> logger)
